@@ -1,120 +1,67 @@
 import { useEffect, useState } from "react";
-import Card from "../components/Card";
-import OrderForm from "../components/OrderForm";
+import { useAppContext } from "../context/AppContext";
+import SnackCard from "../components/SnackCard";
+import OrderModal from "../components/OrderModal";
+import Spinner from "../components/Spinner";
+import ErrorMessage from "../components/ErrorMessage";
+import EmptyState from "../components/EmptyState";
 
 const Snacks = () => {
-  const [snacks, setSnacks] = useState([]);
-  const [students, setStudents] = useState([]);
-  const [error, setError] = useState(null);
+  const { snacks, students, fetchSnacks, fetchStudents, placeOrder } =
+    useAppContext();
   const [selectedSnack, setSelectedSnack] = useState(null);
-  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Fetch snacks and students
-    Promise.all([
-      fetch("http://localhost:3001/snacks").then((res) => res.json()),
-      fetch("http://localhost:3001/students").then((res) => res.json())
-    ])
-      .then(([snacksData, studentsData]) => {
-        setSnacks(snacksData);
-        setStudents(studentsData);
-        setLoading(false);
-      })
-      .catch(() => {
-        setError("Failed to load snacks or students");
-        setLoading(false);
-      });
-  }, []);
+    fetchSnacks();
+    fetchStudents();
+  }, [fetchSnacks, fetchStudents]);
 
-  // Get recent orders from localStorage safely
-  const recentOrders = JSON.parse(localStorage.getItem("recentOrders") || "[]");
-
-  const handleOrderClick = (snack) => {
-    setSelectedSnack(snack);
-  };
-
-  const closeModal = () => {
-    setSelectedSnack(null);
-  };
-
-  if (loading) {
-    return <p style={{ textAlign: "center" }}>Loading snacks...</p>;
+  // Loading state
+  if (snacks.loading) {
+    return <Spinner size="lg" message="Loading snacks…" />;
   }
 
-  if (error) {
-    return <p style={{ textAlign: "center", color: "red" }}>{error}</p>;
+  // Error state
+  if (snacks.error) {
+    return <ErrorMessage message={snacks.error} onRetry={fetchSnacks} />;
+  }
+
+  // Empty state
+  if (snacks.data.length === 0) {
+    return (
+      <EmptyState
+        icon="🍔"
+        title="No snacks available"
+        description="Check back later for tasty snacks!"
+      />
+    );
   }
 
   return (
-    <div style={{ maxWidth: "1100px", margin: "auto", padding: "20px" }}>
-      <h2
-        style={{
-          textAlign: "center",
-          marginBottom: "25px",
-          fontSize: "28px",
-          color: "#333",
-        }}
-      >
-        🍔 Snacks Menu
-      </h2>
+    <div className="page-container">
+      <div className="page-header">
+        <h1 className="page-title">Snacks Menu</h1>
+        <p className="page-subtitle">
+          Browse and order from {snacks.data.length} available snacks
+        </p>
+      </div>
 
-      {/* RECENT ORDERS */}
-      {recentOrders.length > 0 && (
-        <div style={{ marginBottom: "20px" }}>
-          <h3>🕒 Recent Orders</h3>
-          <ul>
-            {recentOrders.slice(-5).map((o, i) => (
-              <li key={i}>
-                {o.student} ordered {o.snack} x{o.quantity} → ₹{o.amount}
-              </li>
-            ))}
-          </ul>
-        </div>
-      )}
-
-      {/* SNACKS GRID */}
-      <div
-        style={{
-          display: "grid",
-          gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
-          gap: "25px",
-        }}
-      >
-        {snacks.map((snack) => (
-          <Card key={snack.id}>
-            <h3 style={{ marginBottom: "10px" }}>{snack.name}</h3>
-            <p>💰 ₹{snack.price}</p>
-            <p style={{ color: "#777" }}>📦 Orders: {snack.ordersCount}</p>
-            <button
-              onClick={() => handleOrderClick(snack)}
-              style={{
-                marginTop: "12px",
-                padding: "10px",
-                width: "100%",
-                background: "linear-gradient(135deg, #ff7e5f, #feb47b)",
-                color: "white",
-                border: "none",
-                borderRadius: "8px",
-                cursor: "pointer",
-                fontWeight: "bold",
-                transition: "0.2s",
-              }}
-              onMouseEnter={(e) => (e.target.style.opacity = "0.85")}
-              onMouseLeave={(e) => (e.target.style.opacity = "1")}
-            >
-              Order Now
-            </button>
-          </Card>
+      <div className="card-grid">
+        {snacks.data.map((snack) => (
+          <SnackCard
+            key={snack.id}
+            snack={snack}
+            onOrder={setSelectedSnack}
+          />
         ))}
       </div>
 
-      {/* ORDER FORM MODAL */}
       {selectedSnack && (
-        <OrderForm
+        <OrderModal
           snack={selectedSnack}
-          students={students}
-          onClose={closeModal}
-          onSuccess={() => window.location.reload()}
+          students={students.data}
+          onClose={() => setSelectedSnack(null)}
+          onSubmit={placeOrder}
         />
       )}
     </div>

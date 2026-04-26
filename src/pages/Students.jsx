@@ -1,79 +1,88 @@
 import { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
-import Card from "../components/Card";
-import CreateStudent from "./CreateStudent";
+import { useAppContext } from "../context/AppContext";
+import StudentCard from "../components/StudentCard";
+import Spinner from "../components/Spinner";
+import ErrorMessage from "../components/ErrorMessage";
+import EmptyState from "../components/EmptyState";
 
 const Students = () => {
-  const [students, setStudents] = useState([]);
-  const [error, setError] = useState(null);
-  const navigate = useNavigate();
+  const { students, fetchStudents, createStudent } = useAppContext();
+  const [name, setName] = useState("");
+  const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
-    fetch("http://localhost:3001/students")
-      .then((res) => res.json())
-      .then((data) => setStudents(data))
-      .catch(() => setError("Failed to load students"));
-  }, []);
+    fetchStudents();
+  }, [fetchStudents]);
 
-  if (error) {
-    return <p style={{ textAlign: "center", color: "red" }}>{error}</p>;
+  const handleCreateStudent = async (e) => {
+    e.preventDefault();
+    const trimmed = name.trim();
+    if (!trimmed) return;
+
+    setSubmitting(true);
+    const success = await createStudent(trimmed);
+    if (success) setName("");
+    setSubmitting(false);
+  };
+
+  // Loading state
+  if (students.loading && students.data.length === 0) {
+    return <Spinner size="lg" message="Loading students…" />;
   }
 
-  if (!students.length) {
-    return <p style={{ textAlign: "center" }}>Loading students...</p>;
+  // Error state
+  if (students.error && students.data.length === 0) {
+    return <ErrorMessage message={students.error} onRetry={fetchStudents} />;
   }
 
   return (
-    <div style={{ maxWidth: "1100px", margin: "auto", padding: "20px" }}>
-      <h2 style={{ textAlign: "center", marginBottom: "20px" }}>
-        👩‍🎓 Students
-      </h2>
-
-      <CreateStudent />
-
-      <div
-        style={{
-          display: "grid",
-          gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
-          gap: "25px",
-        }}
-      >
-        {students.map((student) => (
-          <Card key={student.id}>
-            <h3>{student.name}</h3>
-
-            <p style={{ color: "#555" }}>
-              Referral: {student.referralCode}
-            </p>
-
-            <p
-              style={{
-                fontWeight: "bold",
-                color: "#2e7d32",
-                marginTop: "8px",
-              }}
-            >
-              💰 ₹{student.totalSpent}
-            </p>
-
-            <button
-              onClick={() => navigate(`/student/${student.id}`)}
-              style={{
-                marginTop: "12px",
-                padding: "8px",
-                width: "100%",
-                background: "#1976d2",
-                color: "white",
-                border: "none",
-                borderRadius: "6px",
-                cursor: "pointer",
-              }}
-            >
-              View Details
-            </button>
-          </Card>
-        ))}
+    <div className="page-container">
+      <div className="page-header">
+        <h1 className="page-title">Students</h1>
+        <p className="page-subtitle">
+          {students.data.length} registered student{students.data.length !== 1 ? "s" : ""}
+        </p>
       </div>
+
+      {/* Create student form */}
+      <form className="form-inline" onSubmit={handleCreateStudent} style={{ marginBottom: "var(--space-8)" }}>
+        <div className="form-group">
+          <label className="form-label" htmlFor="new-student-name">
+            Add New Student
+          </label>
+          <input
+            id="new-student-name"
+            type="text"
+            className="form-input"
+            placeholder="Enter student name"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            disabled={submitting}
+          />
+        </div>
+        <button
+          type="submit"
+          className="btn btn-success"
+          disabled={submitting || !name.trim()}
+        >
+          {submitting ? "Adding…" : "Add Student"}
+        </button>
+      </form>
+
+      {/* Student list */}
+      {students.data.length === 0 ? (
+        <EmptyState
+          icon="👩‍🎓"
+          title="No students yet"
+          description="Add a student to get started."
+        />
+      ) : (
+        <div className="card-grid">
+          {students.data.map((student) => (
+            <StudentCard key={student.id} student={student} />
+          ))}
+        </div>
+      )}
     </div>
   );
 };

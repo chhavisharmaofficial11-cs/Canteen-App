@@ -1,89 +1,97 @@
-import { useParams } from "react-router-dom";
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
+import { useParams, Link } from "react-router-dom";
+import { useAppContext } from "../context/AppContext";
+import Spinner from "../components/Spinner";
+import ErrorMessage from "../components/ErrorMessage";
+import EmptyState from "../components/EmptyState";
 
 const StudentDetail = () => {
-  const { id } = useParams(); // Get ID from URL
-  const [student, setStudent] = useState(null);
-  const [loading, setLoading] = useState(true);
+  const { id } = useParams();
+  const { currentStudent, fetchStudent } = useAppContext();
 
   useEffect(() => {
-    // Fetch single student by ID
-    fetch(`http://localhost:3001/students/${id}`)
-      .then((res) => res.json())
-      .then((data) => {
-        setStudent(data);
-        setLoading(false);
-      })
-      .catch((err) => {
-        console.error(err);
-        setLoading(false);
-      });
-  }, [id]);
+    fetchStudent(id);
+  }, [id, fetchStudent]);
 
-  if (loading) return <p style={{ textAlign: "center" }}>Loading...</p>;
-  if (!student) return <p style={{ textAlign: "center" }}>Student not found</p>;
+  if (currentStudent.loading) {
+    return <Spinner size="lg" message="Loading student details…" />;
+  }
 
-  const handleOrder = async () => {
-    const snackId = prompt("Enter Snack ID");
-    const quantity = prompt("Enter quantity (1-5)");
+  if (currentStudent.error) {
+    return (
+      <ErrorMessage
+        message={currentStudent.error}
+        onRetry={() => fetchStudent(id)}
+      />
+    );
+  }
 
-    if (!snackId || !quantity) return;
+  const student = currentStudent.data;
+  if (!student) return null;
 
-    try {
-      await fetch("http://localhost:3001/orders", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          studentId: Number(id),
-          snackId: Number(snackId),
-          quantity: Number(quantity),
-        }),
-      });
-
-      alert("Order placed!");
-      window.location.reload();
-    } catch (err) {
-      alert("Error placing order");
-      console.error(err);
-    }
-  };
+  // Get initials for avatar
+  const initials = student.name
+    .split(" ")
+    .map((n) => n[0])
+    .join("")
+    .toUpperCase()
+    .slice(0, 2);
 
   return (
-    <div style={{ maxWidth: "800px", margin: "auto", padding: "20px" }}>
-      <h2>{student.name}</h2>
-      <p>Referral: {student.referralCode}</p>
+    <div className="page-container">
+      <Link to="/students" className="back-link">
+        ← Back to Students
+      </Link>
 
-      <p style={{ fontWeight: "bold", color: "#2e7d32" }}>
-        💰 Total Spent: ₹{student.totalSpent ?? 0}
-      </p>
+      <div className="detail-header">
+        <div className="detail-avatar">{initials}</div>
+        <div className="detail-info">
+          <h1>{student.name}</h1>
+          <div className="detail-meta">
+            <span className="detail-stat">
+              Code: <strong className="detail-stat-value">{student.referralCode}</strong>
+            </span>
+            <span className="detail-stat">
+              Spent: <strong className="detail-stat-value">₹{student.totalSpent ?? 0}</strong>
+            </span>
+          </div>
+        </div>
+      </div>
 
-      <button
-        onClick={handleOrder}
-        style={{
-          marginTop: "10px",
-          padding: "8px 12px",
-          background: "#4CAF50",
-          color: "white",
-          border: "none",
-          borderRadius: "5px",
-        }}
-      >
-        ➕ Place Order
-      </button>
+      <div className="detail-section">
+        <h2 className="detail-section-title">Order History</h2>
 
-      <h3 style={{ marginTop: "20px" }}>🧾 Orders</h3>
-
-      {student.orders?.length === 0 ? (
-        <p>No orders yet</p>
-      ) : (
-        <ul>
-          {student.orders?.map((order, index) => (
-            <li key={index}>
-              {order.snackName} × {order.quantity} → ₹{order.amount}
-            </li>
-          ))}
-        </ul>
-      )}
+        {!student.orders || student.orders.length === 0 ? (
+          <EmptyState
+            icon="🧾"
+            title="No orders yet"
+            description="This student hasn't placed any orders."
+          />
+        ) : (
+          <div className="table-wrapper">
+            <table className="table">
+              <thead>
+                <tr>
+                  <th>#</th>
+                  <th>Snack</th>
+                  <th>Qty</th>
+                  <th>Amount</th>
+                </tr>
+              </thead>
+              <tbody>
+                {student.orders.map((order, index) => (
+                  <tr key={index}>
+                    <td>{index + 1}</td>
+                    <td>{order.snackName}</td>
+                    <td>{order.quantity}</td>
+                    <td>₹{order.amount}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
     </div>
   );
 };
